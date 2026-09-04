@@ -1,5 +1,6 @@
 import { McpGateway, PublicMCP, PrivateMCP } from "./mcp-gateway";
 import { extractToken, validateToken, createToken, listTokens, revokeToken, requireAdmin } from "./auth";
+import { homeHTML } from "./home";
 
 export interface Env {
   PublicMCP: DurableObjectNamespace<PublicMCP>;
@@ -102,8 +103,8 @@ export default {
       return json({ status: "ok", service: "mcp-gateway" }, 200, corsHeaders());
     }
 
-    // API info
-    if (url.pathname === "/") {
+    // API info (json for Accept: application/json)
+    if (url.pathname === "/api" || url.pathname === "/api/info") {
       return json({
         name: "MCP Gateway",
         version: "1.0.0",
@@ -117,6 +118,25 @@ export default {
         },
         docs: "https://github.com/HarveyJiang/mcp-gateway/blob/main/AGENT_GUIDE.md"
       }, 200, corsHeaders());
+    }
+
+    // Homepage
+    if (url.pathname === "/" || url.pathname === "/index.html") {
+      // serve html if browser, json if explicit Accept: application/json
+      const accept = request.headers.get("Accept") || "";
+      if (accept.includes("application/json")) {
+        return json({
+          name: "MCP Gateway",
+          version: "1.0.0",
+          endpoints: {
+            public: "https://mcp.2020224.xyz/mcp/public",
+            private: "https://mcp.2020224.xyz/mcp/private",
+          }
+        }, 200, corsHeaders());
+      }
+      return new Response(homeHTML, {
+        headers: { "Content-Type": "text/html; charset=utf-8", ...corsHeaders() }
+      });
     }
 
     return json({ error: "Not found" }, 404, corsHeaders());
