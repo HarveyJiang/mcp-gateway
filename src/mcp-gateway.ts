@@ -1,6 +1,6 @@
 import { McpAgent } from "agents/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { z, ZodRawShape, ZodObject, AnyZodObject } from "zod";
+import { z, ZodRawShape, ZodObject } from "zod";
 import type { Env } from "./index";
 
 // ============================================================================
@@ -8,8 +8,6 @@ import type { Env } from "./index";
 // ============================================================================
 
 export interface GatewayState {
-  tools: Map<string, ToolDefinition>;
-  resources: Map<string, ResourceDefinition>;
   config: GatewayConfig;
 }
 
@@ -52,15 +50,18 @@ export interface ResourceDefinition {
 // Base MCP Gateway Class
 // ============================================================================
 
-export class McpGateway extends McpAgent<Env, GatewayState, {}> {
+export type GatewayProps = { userId?: string; name?: string; scopes?: string[]; plan?: string };
+export class McpGateway extends McpAgent<Env, GatewayState, GatewayProps> {
   server = new McpServer({
     name: "MCP Gateway",
     version: "1.0.0"
   });
 
+  // In-memory registries (not persisted, rebuilt on init)
+  private toolRegistry = new Map<string, ToolDefinition>();
+  private resourceRegistry = new Map<string, ResourceDefinition>();
+
   initialState: GatewayState = {
-    tools: new Map(),
-    resources: new Map(),
     config: {
       name: "MCP Gateway",
       version: "1.0.0",
@@ -71,6 +72,11 @@ export class McpGateway extends McpAgent<Env, GatewayState, {}> {
   };
 
   async init(): Promise<void> {
+    // Defensive: ensure state and config exist (handles upgrades from old schema)
+    if (!this.state || !this.state.config) {
+      console.log("State missing or config undefined, resetting to initialState", JSON.stringify(this.state));
+      this.setState(this.initialState);
+    }
     this.registerBuiltinTools();
     this.registerBuiltinResources();
     await this.onInit(this.state.config);
@@ -84,8 +90,8 @@ export class McpGateway extends McpAgent<Env, GatewayState, {}> {
       { description: "List all available tools in this gateway", inputSchema: {} },
       async () => ({
         content: [{ type: "text", text: JSON.stringify(
-          Array.from(this.state.tools.entries()).map(([name, def]) => ({
-            name, description: def.description, inputSchema: def.inputSchema, annotations: def.annotations
+          Array.from(this.toolRegistry.entries()).map(([name, def]) => ({
+            name, description: def.description, annotations: def.annotations
           })), null, 2) }]
       })
     );
@@ -95,7 +101,7 @@ export class McpGateway extends McpAgent<Env, GatewayState, {}> {
       { description: "List all available resources in this gateway", inputSchema: {} },
       async () => ({
         content: [{ type: "text", text: JSON.stringify(
-          Array.from(this.state.resources.entries()).map(([uri, def]) => ({
+          Array.from(this.resourceRegistry.entries()).map(([uri, def]) => ({
             uri, name: def.name, description: def.description, mimeType: def.mimeType
           })), null, 2) }]
       })
@@ -109,7 +115,7 @@ export class McpGateway extends McpAgent<Env, GatewayState, {}> {
         return {
           content: [{ type: "text", text: JSON.stringify({
             name: config.name, version: config.version, description: config.description,
-            isPublic: config.isPublic, toolCount: this.state.tools.size, resourceCount: this.state.resources.size
+            isPublic: config.isPublic, toolCount: this.toolRegistry.size, resourceCount: this.resourceRegistry.size
           }, null, 2) }]
         };
       }
@@ -121,18 +127,26 @@ export class McpGateway extends McpAgent<Env, GatewayState, {}> {
       contents: [{ text: JSON.stringify(this.state.config, null, 2), uri: uri.href }]
     }));
     this.server.resource("gateway:tools", "mcp://gateway/tools", async (uri) => ({
-      contents: [{ text: JSON.stringify(Array.from(this.state.tools.keys()), null, 2), uri: uri.href }]
+      contents: [{ text: JSON.stringify(Array.from(this.toolRegistry.keys()), null, 2), uri: uri.href }]
     }));
   }
 
   protected registerTool<TSchema extends ZodRawShape>(def: ToolDefinition<TSchema>): void {
-    if (this.state.tools.has(def.name)) throw new Error(`Tool ${def.name} already registered`);
-    this.state.tools.set(def.name, def as unknown as ToolDefinition);
+    if (this.toolRegistry.has(def.name)) throw new Error(`Tool ${def.name} already registered`);
+    this.toolRegistry.set(def.name, def as unknown as ToolDefinition);
 
     const callback = async (args: unknown) => {
+      // 1) global gateway allow list (for PrivateMCP)
       if (!this.state.config.isPublic && this.state.config.allowedTools) {
         if (!this.state.config.allowedTools.includes(def.name)) {
           throw new Error(`Tool ${def.name} not allowed in private gateway`);
+        }
+      }
+      // 2) per-token scopes (passed via ctx.props)
+      const props = (this as any).props as GatewayProps | undefined;
+      if (props?.scopes && props.scopes.length > 0) {
+        if (!props.scopes.includes(def.name) && !props.scopes.includes("*")) {
+          throw new Error(`Tool ${def.name} not in token scopes`);
         }
       }
       return def.handler(args as z.infer<ZodObject<TSchema>>);
@@ -146,14 +160,14 @@ export class McpGateway extends McpAgent<Env, GatewayState, {}> {
   }
 
   protected registerResource(def: ResourceDefinition): void {
-    if (this.state.resources.has(def.uri)) throw new Error(`Resource ${def.uri} already registered`);
-    this.state.resources.set(def.uri, def);
+    if (this.resourceRegistry.has(def.uri)) throw new Error(`Resource ${def.uri} already registered`);
+    this.resourceRegistry.set(def.uri, def);
     this.server.resource(def.name, def.uri, async (uri) => def.handler(uri));
   }
 
   protected updateConfig(config: Partial<GatewayConfig>): void {
     const newConfig = { ...this.state.config, ...config };
-    this.setState({ ...this.state, config: newConfig });
+    this.setState({ config: newConfig });
   }
 
   protected getConfig(): GatewayConfig { return this.state.config; }
@@ -165,8 +179,6 @@ export class McpGateway extends McpAgent<Env, GatewayState, {}> {
 
 export class PublicMCP extends McpGateway {
   initialState: GatewayState = {
-    tools: new Map(),
-    resources: new Map(),
     config: {
       name: "MCP Gateway - Public",
       version: "1.0.0",
@@ -230,8 +242,6 @@ export class PublicMCP extends McpGateway {
 
 export class PrivateMCP extends McpGateway {
   initialState: GatewayState = {
-    tools: new Map(),
-    resources: new Map(),
     config: {
       name: "MCP Gateway - Private",
       version: "1.0.0",
