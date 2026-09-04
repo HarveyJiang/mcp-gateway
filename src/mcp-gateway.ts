@@ -2,6 +2,7 @@ import { McpAgent } from "agents/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z, ZodRawShape, ZodObject } from "zod";
 import type { Env } from "./index";
+import { getUserWorkspace } from "./workspace";
 
 // ============================================================================
 // Types
@@ -245,9 +246,9 @@ export class PrivateMCP extends McpGateway {
     config: {
       name: "MCP Gateway - Private",
       version: "1.0.0",
-      description: "Private MCP services for authenticated users",
+      description: "Private MCP services for authenticated users (with Computer workspace)",
       isPublic: false,
-      allowedTools: ["private_echo", "private_get_config", "private_set_config"],
+      allowedTools: ["private_echo", "private_get_config", "private_set_config", "computer_write", "computer_read", "computer_ls", "computer_rm", "computer_exec", "computer_git_clone", "computer_mkdir"],
       rateLimit: { requestsPerMinute: 300, requestsPerHour: 10000 }
     }
   };
@@ -297,6 +298,164 @@ export class PrivateMCP extends McpGateway {
         if (rateLimit) updates.rateLimit = { ...this.state.config.rateLimit, ...rateLimit } as RateLimitConfig;
         this.updateConfig(updates);
         return { content: [{ type: "text", text: "Configuration updated successfully" }] };
+      }
+    });
+
+    // ===== Computer Workspace Tools (persistent 10GB) =====
+    // helper to get user workspace by token userId (props)
+    const getWs = async () => {
+      const props = (this as any).props as GatewayProps | undefined;
+      const userId = props?.userId || (this as any).name || "anonymous";
+      // @ts-ignore this.env exists on McpAgent
+      const env = (this as any).env as Env;
+      const ws = await getUserWorkspace(env, userId);
+      return ws;
+    };
+
+    this.registerTool({
+      name: "computer_write",
+      description: "Write file to persistent workspace (10GB, survives restarts). Use for AI to save notes, code, configs. Auto-creates parent dirs.",
+      inputSchema: {
+        path: z.string().describe("Absolute path e.g. /notes/todo.md or /workspace/app/index.ts"),
+        content: z.string().describe("File content"),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false },
+      handler: async ({ path, content }) => {
+        console.log("computer_write", path);
+        const ws: any = await getWs();
+        try {
+          // auto mkdir parent
+          const dir = path.substring(0, path.lastIndexOf("/")) || "/";
+          if (dir !== "/") {
+            try { await ws.fs.mkdir(dir, { recursive: true }); } catch {}
+          }
+          await ws.fs.writeFile(path, content);
+          console.log("computer_write done");
+          return { content: [{ type: "text", text: `Written ${path} (${content.length} bytes)` }] };
+        } catch (e: any) {
+          console.log("computer_write error", e.message);
+          return { content: [{ type: "text", text: `Error: ${e.message}` }] };
+        }
+      }
+    });
+
+    this.registerTool({
+      name: "computer_mkdir",
+      description: "Create directory in workspace (recursive)",
+      inputSchema: { path: z.string().describe("Directory path e.g. /notes/daily") },
+      annotations: { readOnlyHint: false },
+      handler: async ({ path }) => {
+        const ws: any = await getWs();
+        try {
+          await ws.fs.mkdir(path, { recursive: true });
+          return { content: [{ type: "text", text: `Created ${path}` }] };
+        } catch (e: any) {
+          return { content: [{ type: "text", text: `Error: ${e.message}` }] };
+        }
+      }
+    });
+
+    this.registerTool({
+      name: "computer_read",
+      description: "Read file from persistent workspace",
+      inputSchema: { path: z.string().describe("Absolute path e.g. /notes/todo.md") },
+      annotations: { readOnlyHint: true },
+      handler: async ({ path }) => {
+        console.log("computer_read", path);
+        const ws: any = await getWs();
+        try {
+          const data = await ws.fs.readFile(path, "utf8");
+          return { content: [{ type: "text", text: String(data) }] };
+        } catch (e: any) {
+          return { content: [{ type: "text", text: `Error: ${e.message}` }] };
+        }
+      }
+    });
+
+    this.registerTool({
+      name: "computer_ls",
+      description: "List directory in workspace",
+      inputSchema: { path: z.string().default("/").describe("Directory path e.g. / or /workspace") },
+      annotations: { readOnlyHint: true },
+      handler: async ({ path }) => {
+        console.log("computer_ls", path);
+        const ws: any = await getWs();
+        try {
+          const entries = await ws.fs.readdir(path);
+          return { content: [{ type: "text", text: JSON.stringify(entries, null, 2) }] };
+        } catch (e: any) {
+          return { content: [{ type: "text", text: `Error: ${e.message}` }] };
+        }
+      }
+    });
+
+    this.registerTool({
+      name: "computer_rm",
+      description: "Delete file or directory in workspace",
+      inputSchema: {
+        path: z.string().describe("Path to delete"),
+        recursive: z.boolean().default(false).describe("Recursive for directories"),
+      },
+      annotations: { destructiveHint: true },
+      handler: async ({ path, recursive }) => {
+        const ws: any = await getWs();
+        try {
+          await ws.fs.rm(path, { recursive });
+          return { content: [{ type: "text", text: `Removed ${path}` }] };
+        } catch (e: any) {
+          return { content: [{ type: "text", text: `Error: ${e.message}` }] };
+        }
+      }
+    });
+
+    this.registerTool({
+      name: "computer_exec",
+      description: "Execute shell command in workspace (requires paid Workers plan for backend, currently disabled). Use computer_read/ls for free plan.",
+      inputSchema: {
+        command: z.string().describe("Shell command e.g. 'cat /notes/todo.md' or 'ls -la /'"),
+      },
+      annotations: { destructiveHint: false, openWorldHint: false },
+      handler: async ({ command }) => {
+        const ws: any = await getWs();
+        try {
+          if (!ws.runtime?.exec) {
+            return { content: [{ type: "text", text: "Exec backend not enabled (free plan). File ops work: use computer_write/read/ls/rm. Upgrade to Workers Paid to enable WorkerShellBackend for exec." }] };
+          }
+          const run: any = await ws.runtime.exec(command);
+          const res: any = await run.result();
+          const out = res.stdout ?? res.output ?? JSON.stringify(res);
+          const err = res.stderr ? `\nSTDERR: ${res.stderr}` : "";
+          return { content: [{ type: "text", text: `Exit ${res.exitCode ?? 0}\n${out}${err}` }] };
+        } catch (e: any) {
+          return { content: [{ type: "text", text: `Exec error: ${e.message}. Note: exec needs paid plan.` }] };
+        }
+      }
+    });
+
+    this.registerTool({
+      name: "computer_git_clone",
+      description: "Git clone a repository into workspace (persistent)",
+      inputSchema: {
+        url: z.string().describe("Git repo URL e.g. https://github.com/cloudflare/computer"),
+        dir: z.string().default("/workspace/repo").describe("Destination dir in workspace"),
+      },
+      annotations: { destructiveHint: false },
+      handler: async ({ url, dir }) => {
+        const ws: any = await getWs();
+        try {
+          // @ts-ignore git client on workspace
+          if (ws.git?.clone) {
+            await ws.git.clone({ url, dir });
+            return { content: [{ type: "text", text: `Cloned ${url} to ${dir}` }] };
+          } else {
+            // fallback via exec
+            const run: any = await ws.runtime.exec(`git clone ${url} ${dir}`);
+            const res: any = await run.result();
+            return { content: [{ type: "text", text: `git clone exit ${res.exitCode}: ${res.stdout || res.stderr}` }] };
+          }
+        } catch (e: any) {
+          return { content: [{ type: "text", text: `Clone error: ${e.message}` }] };
+        }
       }
     });
 

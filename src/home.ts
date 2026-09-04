@@ -34,7 +34,7 @@ export const homeHTML = `<!DOCTYPE html>
   <!-- Hero -->
   <section class="max-w-6xl mx-auto px-6 pt-10 pb-6">
     <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-zinc-200 text-xs text-zinc-600">
-      <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> 2 MCP servers · 9 tools · Streamable HTTP
+      <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> 2 MCP servers · 13 tools · 10GB持久化 · Streamable HTTP
     </div>
     <h1 class="mt-4 text-4xl sm:text-5xl font-bold tracking-tight">模型上下文协议<span class="text-zinc-400">网关</span></h1>
     <p class="mt-3 text-zinc-600 max-w-2xl">统一的 MCP 服务网关，公开服务无需鉴权，私有服务支持 <span class="mono bg-white border border-zinc-200 px-1.5 py-0.5 rounded text-sm">Bearer mcp_sk_...</span> 按 token 限 scopes / quota / 限流。给 Hermes 这类无弹窗智能体直接用。</p>
@@ -104,8 +104,8 @@ export const homeHTML = `<!DOCTYPE html>
         </div>
       </div>
 
-      <!-- Private MCP Card -->
-      <div class="mcp-card group bg-white rounded-[24px] border border-zinc-200 overflow-hidden hover:border-zinc-300 transition" data-type="private" data-search="private 私有 付费 token 鉴权 scopes quota">
+      <!-- Private MCP Card + Computer -->
+      <div class="mcp-card group bg-white rounded-[24px] border border-zinc-200 overflow-hidden hover:border-zinc-300 transition" data-type="private" data-search="private 私有 付费 token 鉴权 scopes quota computer 电脑 文件 持久化 fs exec git">
         <div class="p-6">
           <div class="flex items-start justify-between">
             <div class="flex items-center gap-3">
@@ -124,20 +124,41 @@ export const homeHTML = `<!DOCTYPE html>
           </div>
         </div>
         <div class="bg-zinc-50 border-t border-zinc-200 p-2">
-          <div class="text-xs text-zinc-500 px-4 py-2">包含 3 个私有工具 + 1 资源</div>
+          <div class="text-xs text-zinc-500 px-4 py-2">私有 13 个工具：3 私有 + 7 Computer持久化 + 3 网关</div>
           <div class="space-y-2 px-2 pb-2">
             <div class="tool bg-white border border-zinc-200 rounded-xl p-3" data-search="private_echo 回显 私有">
               <div class="flex items-center justify-between"><span class="mono text-sm font-medium">private_echo</span><span class="text-xs px-2 py-0.5 rounded-full bg-zinc-900 text-white">private</span></div>
               <div class="text-sm text-zinc-600 mt-1">回显消息，测试私有链路。</div>
               <div class="mt-2 mono text-xs bg-zinc-900 text-zinc-100 rounded-lg p-2.5">{"message":"hello hermes"} → "[PRIVATE] hello hermes"</div>
             </div>
-            <div class="tool bg-white border border-zinc-200 rounded-xl p-3" data-search="private_get_config 配置 私有">
-              <div class="mono text-sm font-medium">private_get_config</div>
-              <div class="text-sm text-zinc-600 mt-1">获取私有网关配置。</div>
+            <div class="tool bg-emerald-50 border border-emerald-200 rounded-xl p-3" data-search="computer_write 文件 写入 持久化 10gb">
+              <div class="flex items-center justify-between"><span class="mono text-sm font-medium">computer_write</span><span class="text-xs px-2 py-0.5 rounded-full bg-emerald-600 text-white">Computer</span></div>
+              <div class="text-sm text-zinc-600 mt-1">写入持久化文件（10GB，跨会话不丢，自动建目录）。</div>
+              <div class="mt-2 mono text-xs bg-zinc-900 text-zinc-100 rounded-lg p-2.5">{"path":"/notes/todo.md","content":"- [ ] ship it"}</div>
             </div>
-            <div class="tool bg-white border border-zinc-200 rounded-xl p-3" data-search="private_set_config 管理员 配置">
-              <div class="flex items-center justify-between"><span class="mono text-sm font-medium">private_set_config</span><span class="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">admin</span></div>
-              <div class="text-sm text-zinc-600 mt-1">更新网关配置（需 scopes 含 private_set_config）。</div>
+            <div class="tool bg-emerald-50 border border-emerald-200 rounded-xl p-3" data-search="computer_read 读取 文件">
+              <div class="mono text-sm font-medium">computer_read</div>
+              <div class="text-sm text-zinc-600 mt-1">读取持久化文件。</div>
+            </div>
+            <div class="tool bg-emerald-50 border border-emerald-200 rounded-xl p-3" data-search="computer_ls 列表 目录 ls">
+              <div class="mono text-sm font-medium">computer_ls</div>
+              <div class="text-sm text-zinc-600 mt-1">列目录，返回文件列表。</div>
+            </div>
+            <div class="tool bg-emerald-50 border border-emerald-200 rounded-xl p-3" data-search="computer_mkdir 创建 目录 mkdir">
+              <div class="mono text-sm font-medium">computer_mkdir</div>
+              <div class="text-sm text-zinc-600 mt-1">创建目录（递归）。</div>
+            </div>
+            <div class="tool bg-white border border-zinc-200 rounded-xl p-3" data-search="computer_rm 删除 rm">
+              <div class="mono text-sm font-medium">computer_rm</div>
+              <div class="text-sm text-zinc-600 mt-1">删除文件/目录。</div>
+            </div>
+            <div class="tool bg-white border border-zinc-200 rounded-xl p-3" data-search="computer_exec 执行 shell 免费版不可用">
+              <div class="mono text-sm font-medium">computer_exec</div>
+              <div class="text-sm text-zinc-600 mt-1">执行 shell（需付费 Workers 计划，免费版提示升级）。</div>
+            </div>
+            <div class="tool bg-emerald-50 border border-emerald-200 rounded-xl p-3" data-search="computer_git_clone git 克隆">
+              <div class="mono text-sm font-medium">computer_git_clone</div>
+              <div class="text-sm text-zinc-600 mt-1">git clone 到持久化工作区。</div>
             </div>
             <div class="tool bg-white border border-zinc-200 rounded-xl p-3" data-search="mcp://private/user/profile 资源">
               <div class="mono text-sm font-medium">mcp://private/user/profile</div>

@@ -6,10 +6,14 @@
   "durable_objects": {
     "bindings": [
       { "name": "PublicMCP", "class_name": "PublicMCP" },
-      { "name": "PrivateMCP", "class_name": "PrivateMCP" }
+      { "name": "PrivateMCP", "class_name": "PrivateMCP" },
+      { "name": "Workspace", "class_name": "Workspace" }
     ]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["PublicMCP", "PrivateMCP"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["PublicMCP", "PrivateMCP"] },
+    { "tag": "v2", "new_sqlite_classes": ["Workspace"] }
+  ],
   "d1_databases": [
     { "binding": "DB", "database_name": "mcp-gateway-db", "database_id": "27a50c5b-e822-4282-9b26-c9e0a2c74daf" }
   ],

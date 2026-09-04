@@ -1,16 +1,20 @@
 import { McpGateway, PublicMCP, PrivateMCP } from "./mcp-gateway";
 import { extractToken, validateToken, createToken, listTokens, revokeToken, requireAdmin } from "./auth";
 import { homeHTML } from "./home";
+import { Workspace } from "./workspace";
 
 export interface Env {
-  PublicMCP: DurableObjectNamespace<PublicMCP>;
-  PrivateMCP: DurableObjectNamespace<PrivateMCP>;
-  DB: D1Database;
-  KV: KVNamespace;
+  PublicMCP: any;
+  PrivateMCP: any;
+  Workspace: any;
+  LOADER?: any;
+  DB: any;
+  KV: any;
   ADMIN_TOKEN: string;
 }
 
 export { McpGateway, PublicMCP, PrivateMCP } from "./mcp-gateway";
+export { Workspace } from "./workspace";
 
 function json(data: unknown, status = 200, headers: Record<string,string> = {}) {
   return new Response(JSON.stringify(data, null, 2), {
@@ -28,7 +32,7 @@ function corsHeaders() {
 }
 
 export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
     const url = new URL(request.url);
 
     if (request.method === "OPTIONS") {
@@ -96,6 +100,37 @@ export default {
       const res = await validateToken(env, token);
       if (!res.valid) return json({ valid: false, reason: res.reason }, 200, corsHeaders());
       return json({ valid: true, info: { id: res.info.id, name: res.info.name, plan: res.info.plan, quota: res.info.quota, used: res.info.used, scopes: res.info.scopes } }, 200, corsHeaders());
+    }
+
+    // Debug workspace (no auth, for testing Computer)  ?user=xxx&path=/hello.txt&op=write|read|ls
+    if (url.pathname === "/debug/workspace") {
+      try {
+        const { getUserWorkspace } = await import("./workspace");
+        const user = url.searchParams.get("user") || "debug-test";
+        const op = url.searchParams.get("op") || "test";
+        const p = url.searchParams.get("path") || "/hello.txt";
+        const ws: any = await getUserWorkspace(env, user);
+        if (op === "write") {
+          const content = url.searchParams.get("content") || "world " + new Date().toISOString();
+          const dir = p.substring(0, p.lastIndexOf("/")) || "/";
+          if (dir !== "/") try { await ws.fs.mkdir(dir, { recursive: true }); } catch {}
+          await ws.fs.writeFile(p, content);
+          return json({ ok: true, op, user, path: p, content }, 200, corsHeaders());
+        } else if (op === "read") {
+          const data = await ws.fs.readFile(p, "utf8");
+          return json({ ok: true, op, user, path: p, data }, 200, corsHeaders());
+        } else if (op === "ls") {
+          const list = await ws.fs.readdir(p);
+          return json({ ok: true, op, user, path: p, list }, 200, corsHeaders());
+        } else {
+          await ws.fs.writeFile("/hello.txt", "world " + new Date().toISOString());
+          const data = await ws.fs.readFile("/hello.txt", "utf8");
+          const list = await ws.fs.readdir("/");
+          return json({ ok: true, data, list, user }, 200, corsHeaders());
+        }
+      } catch (e: any) {
+        return json({ ok: false, error: e.message, stack: e.stack }, 500, corsHeaders());
+      }
     }
 
     // Health check
