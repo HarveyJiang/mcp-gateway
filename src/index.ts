@@ -1,14 +1,14 @@
 import { McpAgent } from "agents/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { McpGateway } from "./mcp-gateway";
+import { McpGateway, PublicMCP, PrivateMCP } from "./mcp-gateway";
 
 export interface Env {
-  PublicMCP: DurableObjectNamespace<McpGateway>;
-  PrivateMCP: DurableObjectNamespace<McpGateway>;
+  PublicMCP: DurableObjectNamespace<PublicMCP>;
+  PrivateMCP: DurableObjectNamespace<PrivateMCP>;
 }
 
-export { McpGateway } from "./mcp-gateway";
+export { McpGateway, PublicMCP, PrivateMCP } from "./mcp-gateway";
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
