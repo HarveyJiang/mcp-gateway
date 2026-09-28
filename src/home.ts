@@ -34,7 +34,7 @@ export const homeHTML = `<!DOCTYPE html>
   <!-- Hero -->
   <section class="max-w-6xl mx-auto px-6 pt-10 pb-6">
     <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-zinc-200 text-xs text-zinc-600">
-      <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> 2 MCP servers · 13 tools · 10GB持久化 · Streamable HTTP
+      <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> 2 MCP servers · 19 tools · 10GB持久化 · Streamable HTTP
     </div>
     <h1 class="mt-4 text-4xl sm:text-5xl font-bold tracking-tight">模型上下文协议<span class="text-zinc-400">网关</span></h1>
     <p class="mt-3 text-zinc-600 max-w-2xl">统一的 MCP 服务网关，公开服务无需鉴权，私有服务支持 <span class="mono bg-white border border-zinc-200 px-1.5 py-0.5 rounded text-sm">Bearer mcp_sk_...</span> 按 token 限 scopes / quota / 限流。给 Hermes 这类无弹窗智能体直接用。</p>
@@ -60,7 +60,7 @@ export const homeHTML = `<!DOCTYPE html>
   <main class="max-w-6xl mx-auto px-6 pb-12">
     <div id="mcpGrid" class="grid md:grid-cols-2 gap-6">
       <!-- Public MCP Card -->
-      <div class="mcp-card group bg-white rounded-[24px] border border-zinc-200 overflow-hidden hover:border-zinc-300 transition" data-type="public" data-search="public mcp gateway 公开 通用技能 天气 时间 uuid">
+      <div class="mcp-card group bg-white rounded-[24px] border border-zinc-200 overflow-hidden hover:border-zinc-300 transition" data-type="public" data-search="public mcp gateway 公开 通用技能 天气 时间 uuid github 搜索 仓库">
         <div class="p-6">
           <div class="flex items-start justify-between">
             <div class="flex items-center gap-3">
@@ -79,7 +79,7 @@ export const homeHTML = `<!DOCTYPE html>
           </div>
         </div>
         <div class="bg-zinc-50 border-t border-zinc-200 p-2">
-          <div class="text-xs text-zinc-500 px-4 py-2">包含 6 个工具</div>
+          <div class="text-xs text-zinc-500 px-4 py-2">包含 7 个工具</div>
           <div class="space-y-2 px-2 pb-2">
             <div class="tool bg-white border border-zinc-200 rounded-xl p-3" data-search="public_get_time 时间 时区 shanghai tokyo new_york">
               <div class="flex items-center justify-between"><span class="mono text-sm font-medium">public_get_time</span><span class="text-xs px-2 py-0.5 rounded-full bg-zinc-900 text-white">readOnly</span></div>
@@ -96,6 +96,11 @@ export const homeHTML = `<!DOCTYPE html>
               <div class="text-sm text-zinc-600 mt-1">天气演示（后续接真实 API）。</div>
               <div class="mt-2 mono text-xs bg-zinc-900 text-zinc-100 rounded-lg p-2.5">{"location":"Beijing","units":"metric"}</div>
             </div>
+            <div class="tool bg-white border border-zinc-200 rounded-xl p-3" data-search="public_github_search github 搜索 仓库 开源 stars">
+              <div class="flex items-center justify-between"><span class="mono text-sm font-medium">public_github_search</span><span class="text-xs px-2 py-0.5 rounded-full bg-zinc-100 border">openWorld</span></div>
+              <div class="text-sm text-zinc-600 mt-1">搜公开 GitHub 仓库，返回名称、简介、stars、语言、链接。</div>
+              <div class="mt-2 mono text-xs bg-zinc-900 text-zinc-100 rounded-lg p-2.5">{"query":"mcp server","per_page":5} → repos[]</div>
+            </div>
             <div class="tool bg-white border border-zinc-200 rounded-xl p-3" data-search="gateway_list_tools gateway_info gateway_list_resources 元信息">
               <div class="mono text-sm font-medium">gateway_* <span class="text-zinc-500 font-normal">gateway_list_tools / gateway_info</span></div>
               <div class="text-sm text-zinc-600 mt-1">网关元信息，无参直接调。</div>
@@ -105,7 +110,7 @@ export const homeHTML = `<!DOCTYPE html>
       </div>
 
       <!-- Private MCP Card + Computer -->
-      <div class="mcp-card group bg-white rounded-[24px] border border-zinc-200 overflow-hidden hover:border-zinc-300 transition" data-type="private" data-search="private 私有 付费 token 鉴权 scopes quota computer 电脑 文件 持久化 fs exec git">
+      <div class="mcp-card group bg-white rounded-[24px] border border-zinc-200 overflow-hidden hover:border-zinc-300 transition" data-type="private" data-search="private 私有 付费 token 鉴权 scopes quota computer 电脑 文件 持久化 fs exec git ai 大模型 生成 r2 存储 上传">
         <div class="p-6">
           <div class="flex items-start justify-between">
             <div class="flex items-center gap-3">
@@ -124,7 +129,7 @@ export const homeHTML = `<!DOCTYPE html>
           </div>
         </div>
         <div class="bg-zinc-50 border-t border-zinc-200 p-2">
-          <div class="text-xs text-zinc-500 px-4 py-2">私有 13 个工具：3 私有 + 7 Computer持久化 + 3 网关</div>
+          <div class="text-xs text-zinc-500 px-4 py-2">私有 18 个工具：3 私有 + 7 Computer持久化 + 1 AI + 4 R2 + 3 网关</div>
           <div class="space-y-2 px-2 pb-2">
             <div class="tool bg-white border border-zinc-200 rounded-xl p-3" data-search="private_echo 回显 私有">
               <div class="flex items-center justify-between"><span class="mono text-sm font-medium">private_echo</span><span class="text-xs px-2 py-0.5 rounded-full bg-zinc-900 text-white">private</span></div>
@@ -159,6 +164,15 @@ export const homeHTML = `<!DOCTYPE html>
             <div class="tool bg-emerald-50 border border-emerald-200 rounded-xl p-3" data-search="computer_git_clone git 克隆">
               <div class="mono text-sm font-medium">computer_git_clone</div>
               <div class="text-sm text-zinc-600 mt-1">git clone 到持久化工作区。</div>
+            </div>
+            <div class="tool bg-white border border-zinc-200 rounded-xl p-3" data-search="ai_generate 大模型 生成 总结 翻译 llama workers ai">
+              <div class="flex items-center justify-between"><span class="mono text-sm font-medium">ai_generate</span><span class="text-xs px-2 py-0.5 rounded-full bg-violet-100 text-violet-800 border border-violet-200">AI</span></div>
+              <div class="text-sm text-zinc-600 mt-1">Workers AI 文本生成（默认 llama-3.1-8b），总结翻译问答都行，计入 token quota。</div>
+              <div class="mt-2 mono text-xs bg-zinc-900 text-zinc-100 rounded-lg p-2.5">{"prompt":"总结...","system":"简洁回答"}</div>
+            </div>
+            <div class="tool bg-white border border-zinc-200 rounded-xl p-3" data-search="r2_upload r2_read r2_list r2_delete r2 存储 文件 上传 下载 对象">
+              <div class="mono text-sm font-medium">r2_* <span class="text-zinc-500 font-normal">r2_upload / r2_read / r2_list / r2_delete</span></div>
+              <div class="text-sm text-zinc-600 mt-1">R2 文件存取，按 token 隔离目录，单次上传 512KB、读取 256KB。</div>
             </div>
             <div class="tool bg-white border border-zinc-200 rounded-xl p-3" data-search="mcp://private/user/profile 资源">
               <div class="mono text-sm font-medium">mcp://private/user/profile</div>

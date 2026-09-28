@@ -18,6 +18,8 @@
     { "binding": "DB", "database_name": "mcp-gateway-db", "database_id": "27a50c5b-e822-4282-9b26-c9e0a2c74daf" }
   ],
   "kv_namespaces": [{ "binding": "KV", "id": "338448f29bd04526ae460d2f909608ea" }],
-  "vars": { "ADMIN_TOKEN": "e642b8bf2309a20fb040e059095d065b" },
+  "ai": { "binding": "AI" },
+  "r2_buckets": [{ "binding": "FILES", "bucket_name": "mcp-gateway-files" }],
+  "vars": { "ADMIN_TOKEN": "e642b8bf2309a20fb040e059095d065b", "GITHUB_TOKEN": "" },
   "observability": { "enabled": true }
 }

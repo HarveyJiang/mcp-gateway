@@ -64,7 +64,7 @@ export async function validateToken(env: Env, token: string): Promise<{ valid: t
   } catch {}
 
   // 2. D1 lookup
-  const row = await env.DB.prepare("SELECT * FROM tokens WHERE token_hash = ?").bind(hash).first<TokenRow>();
+  const row = await env.DB.prepare("SELECT * FROM tokens WHERE token_hash = ?").bind(hash).first() as any as TokenRow | null;
   if (!row) return { valid: false, reason: "invalid token" };
   if (!row.is_active) return { valid: false, reason: "token revoked" };
   if (row.expires_at && new Date(row.expires_at) < new Date()) return { valid: false, reason: "token expired" };
@@ -79,8 +79,8 @@ export async function validateToken(env: Env, token: string): Promise<{ valid: t
   const hourKey = `rate:${hash}:h:${Math.floor(now / 3600000)}`;
 
   const [mCount, hCount] = await Promise.all([
-    env.KV.get(minuteKey).then(v => parseInt(v || "0")),
-    env.KV.get(hourKey).then(v => parseInt(v || "0")),
+    env.KV.get(minuteKey).then((v: string | null) => parseInt(v || "0")),
+    env.KV.get(hourKey).then((v: string | null) => parseInt(v || "0")),
   ]);
   if (mCount >= row.rate_limit_rpm) return { valid: false, reason: "rate limited (per minute)" };
   if (hCount >= row.rate_limit_rph) return { valid: false, reason: "rate limited (per hour)" };
@@ -135,17 +135,17 @@ export async function createToken(env: Env, opts: {
     "INSERT INTO tokens (id, token_hash, token_prefix, name, scopes, plan, quota, used, rate_limit_rpm, rate_limit_rph, is_active, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, 1, ?, ?)"
   ).bind(id, hash, prefix, opts.name, JSON.stringify(scopes), plan, quota, rpm, rph, opts.expiresAt ?? null, now).run();
 
-  const row = await env.DB.prepare("SELECT * FROM tokens WHERE id = ?").bind(id).first<TokenRow>();
+  const row = await env.DB.prepare("SELECT * FROM tokens WHERE id = ?").bind(id).first() as any as TokenRow;
   return { id, token, prefix, row: row! };
 }
 
 export async function listTokens(env: Env): Promise<TokenRow[]> {
-  const res = await env.DB.prepare("SELECT id, token_prefix, name, scopes, plan, quota, used, rate_limit_rpm, rate_limit_rph, is_active, expires_at, created_at, last_used_at FROM tokens ORDER BY created_at DESC").all<TokenRow>();
+  const res = await env.DB.prepare("SELECT id, token_prefix, name, scopes, plan, quota, used, rate_limit_rpm, rate_limit_rph, is_active, expires_at, created_at, last_used_at FROM tokens ORDER BY created_at DESC").all() as any as { results: TokenRow[] };
   return res.results ?? [];
 }
 
 export async function revokeToken(env: Env, id: string): Promise<boolean> {
-  const row = await env.DB.prepare("SELECT token_hash FROM tokens WHERE id = ?").bind(id).first<TokenRow>();
+  const row = await env.DB.prepare("SELECT token_hash FROM tokens WHERE id = ?").bind(id).first() as any as TokenRow | null;
   if (!row) return false;
   await env.DB.prepare("UPDATE tokens SET is_active = 0 WHERE id = ?").bind(id).run();
   await env.KV.delete(`token:${row.token_hash}`).catch(()=>{});

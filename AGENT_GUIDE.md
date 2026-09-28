@@ -146,6 +146,11 @@ curl -X POST https://mcp.2020224.xyz/auth/verify -H "Content-Type: application/j
 ### public_get_weather — 天气演示
 - input: `{ location: string, units: "metric"|"imperial" }`
 
+### public_github_search — 搜公开 GitHub 仓库
+- input: `{ query: string, per_page: 1-20 default 5, sort: stars|forks|updated, language?: string }`
+- 示例: `{"name":"public_github_search","arguments":{"query":"mcp server","per_page":5}}`
+- 返回: `{total, repos:[{name, description, stars, language, url}]}`，无 token 时限流 10 次/分钟
+
 ### gateway_* — 元信息
 - `gateway_list_tools` / `gateway_list_resources` / `gateway_info` 均无参
 
@@ -158,7 +163,14 @@ curl -X POST https://mcp.2020224.xyz/auth/verify -H "Content-Type: application/j
 | `private_echo` | 回显 | `message: string`, `prefix: string default "[PRIVATE]"` | `private_echo` 或 `*` |
 | `private_get_config` | 查私有网关配置 | 无 | `private_get_config` |
 | `private_set_config` | 改配置（管理员）| `allowedTools?: string[]`, `rateLimit?: {requestsPerMinute?, requestsPerHour?}` | `private_set_config` |
+| `ai_generate` | Workers AI 文本生成（总结翻译问答，计 quota）| `prompt: string`, `system?: string`, `model default llama-3.1-8b-fast`, `max_tokens default 512` | `ai_generate` 或 `*` |
+| `r2_upload` | R2 上传文本（上限 512KB/次）| `key: "reports/weekly.md"`, `content`, `contentType?` | `r2_upload` 或 `*` |
+| `r2_read` | R2 读取文本（上限 256KB）| `key` | `r2_read` 或 `*` |
+| `r2_list` | R2 按前缀列文件 | `prefix?`, `limit default 50` | `r2_list` 或 `*` |
+| `r2_delete` | R2 删除文件 | `key` | `r2_delete` 或 `*` |
 | 资源 `mcp://private/user/profile` | 当前用户 profile | 无 | 任意有效 token |
+
+> R2 的 key 按 token 隔离（实际存为 `<userId>/<key>`），不同 token 互不可见。
 
 > token 的 scopes 决定能调什么，调不在 scopes 里的会返回 `isError: true, "Tool ... not in token scopes"`
 

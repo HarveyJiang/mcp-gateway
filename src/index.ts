@@ -10,6 +10,9 @@ export interface Env {
   LOADER?: any;
   DB: any;
   KV: any;
+  AI?: any;
+  FILES?: any;
+  GITHUB_TOKEN?: string;
   ADMIN_TOKEN: string;
 }
 

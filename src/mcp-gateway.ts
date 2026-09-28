@@ -234,6 +234,50 @@ export class PublicMCP extends McpGateway {
         return { content: [{ type: "text", text: JSON.stringify(uuids, null, 2) }] };
       }
     });
+
+    this.registerTool({
+      name: "public_github_search",
+      description: "Search public GitHub repositories by keyword. Returns name, description, stars, language, url. No auth needed (rate limited without GITHUB_TOKEN).",
+      inputSchema: {
+        query: z.string().describe("Search keywords, e.g. 'mcp server typescript'"),
+        per_page: z.number().min(1).max(20).default(5).describe("Number of results (1-20)"),
+        sort: z.enum(["stars", "forks", "updated"]).default("stars").describe("Sort order"),
+        language: z.string().optional().describe("Filter by language, e.g. 'TypeScript'"),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: true },
+      handler: async ({ query, per_page, sort, language }) => {
+        try {
+          const q = language ? `${query} language:${language}` : query;
+          const url = `https://api.github.com/search/repositories?q=${encodeURIComponent(q)}&per_page=${per_page}&sort=${sort}&order=desc`;
+          // @ts-ignore env on McpAgent
+          const env = (this as any).env as Env;
+          const headers: Record<string, string> = {
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "mcp-gateway",
+          };
+          if (env.GITHUB_TOKEN) headers["Authorization"] = `Bearer ${env.GITHUB_TOKEN}`;
+          const res = await fetch(url, { headers });
+          if (res.status === 403) {
+            return { content: [{ type: "text", text: "GitHub API rate limited (10 req/min without token). Set GITHUB_TOKEN as Worker secret to raise limits, or retry in a minute." }] };
+          }
+          if (!res.ok) {
+            return { content: [{ type: "text", text: `GitHub API error ${res.status}: ${await res.text()}` }] };
+          }
+          const data = await res.json() as any;
+          const repos = (data.items || []).map((r: any) => ({
+            name: r.full_name,
+            description: r.description,
+            stars: r.stargazers_count,
+            language: r.language,
+            url: r.html_url,
+            updated: r.updated_at,
+          }));
+          return { content: [{ type: "text", text: JSON.stringify({ total: data.total_count, repos }, null, 2) }] };
+        } catch (e: any) {
+          return { content: [{ type: "text", text: `Search failed: ${e.message}. Check network or retry.` }] };
+        }
+      }
+    });
   }
 }
 
@@ -248,7 +292,7 @@ export class PrivateMCP extends McpGateway {
       version: "1.0.0",
       description: "Private MCP services for authenticated users (with Computer workspace)",
       isPublic: false,
-      allowedTools: ["private_echo", "private_get_config", "private_set_config", "computer_write", "computer_read", "computer_ls", "computer_rm", "computer_exec", "computer_git_clone", "computer_mkdir"],
+      allowedTools: ["private_echo", "private_get_config", "private_set_config", "computer_write", "computer_read", "computer_ls", "computer_rm", "computer_exec", "computer_git_clone", "computer_mkdir", "ai_generate", "r2_upload", "r2_read", "r2_list", "r2_delete"],
       rateLimit: { requestsPerMinute: 300, requestsPerHour: 10000 }
     }
   };
@@ -455,6 +499,131 @@ export class PrivateMCP extends McpGateway {
           }
         } catch (e: any) {
           return { content: [{ type: "text", text: `Clone error: ${e.message}` }] };
+        }
+      }
+    });
+
+    // ===== Workers AI (text generation, billed to account, token quota applies) =====
+    this.registerTool({
+      name: "ai_generate",
+      description: "Generate text with Workers AI (default llama-3.1-8b-instruct). Use for summarize, translate, draft, Q&A. Counts against token quota.",
+      inputSchema: {
+        prompt: z.string().describe("User prompt"),
+        system: z.string().optional().describe("System instruction, e.g. 'You are a concise assistant'"),
+        model: z.string().default("@cf/meta/llama-3.1-8b-instruct-fast").describe("Workers AI model id"),
+        max_tokens: z.number().min(1).max(2048).default(512).describe("Max output tokens"),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+      handler: async ({ prompt, system, model, max_tokens }) => {
+        // @ts-ignore env on McpAgent
+        const env = (this as any).env as Env;
+        if (!env.AI) {
+          return { content: [{ type: "text", text: "Workers AI binding not configured. Add \"ai\": {\"binding\": \"AI\"} to wrangler.jsonc and redeploy." }] };
+        }
+        try {
+          const messages = [
+            ...(system ? [{ role: "system", content: system }] : []),
+            { role: "user", content: prompt },
+          ];
+          const out = await env.AI.run(model, { messages, max_tokens }) as any;
+          const text = out.response ?? out.result ?? JSON.stringify(out);
+          return { content: [{ type: "text", text: String(text) }] };
+        } catch (e: any) {
+          return { content: [{ type: "text", text: `AI error: ${e.message}. Check model id and Workers AI availability.` }] };
+        }
+      }
+    });
+
+    // ===== R2 Files (per-token isolated prefix: <userId>/<key>) =====
+    const r2Key = () => {
+      const props = (this as any).props as GatewayProps | undefined;
+      const userId = props?.userId || (this as any).name || "anonymous";
+      // @ts-ignore env on McpAgent
+      const env = (this as any).env as Env;
+      return { userId, bucket: env.FILES };
+    };
+    const cleanKey = (userId: string, key: string) => {
+      const k = key.replace(/^\/+/, "");
+      if (!k || k.includes("..")) throw new Error("Invalid key: must be a relative path without '..'");
+      return `${userId}/${k}`;
+    };
+
+    this.registerTool({
+      name: "r2_upload",
+      description: "Upload text content to R2 (stored under your token prefix, max 512KB per call). Use for reports, exports, shared files.",
+      inputSchema: {
+        key: z.string().describe("Relative path, e.g. 'reports/weekly.md'"),
+        content: z.string().describe("File content (text)"),
+        contentType: z.string().default("text/plain; charset=utf-8").describe("MIME type"),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false },
+      handler: async ({ key, content, contentType }) => {
+        const { userId, bucket } = r2Key();
+        if (!bucket) return { content: [{ type: "text", text: "R2 binding not configured. Add r2_buckets FILES to wrangler.jsonc and redeploy." }] };
+        if (content.length > 512 * 1024) return { content: [{ type: "text", text: "Content too large (max 512KB per call). Split into smaller uploads." }] };
+        try {
+          const fullKey = cleanKey(userId, key);
+          await bucket.put(fullKey, content, { httpMetadata: { contentType } });
+          return { content: [{ type: "text", text: JSON.stringify({ key: fullKey, size: content.length }, null, 2) }] };
+        } catch (e: any) {
+          return { content: [{ type: "text", text: `Upload failed: ${e.message}` }] };
+        }
+      }
+    });
+
+    this.registerTool({
+      name: "r2_read",
+      description: "Read a text file from R2 (your token prefix, max 256KB returned).",
+      inputSchema: { key: z.string().describe("Relative path, e.g. 'reports/weekly.md'") },
+      annotations: { readOnlyHint: true },
+      handler: async ({ key }) => {
+        const { userId, bucket } = r2Key();
+        if (!bucket) return { content: [{ type: "text", text: "R2 binding not configured." }] };
+        try {
+          const obj = await bucket.get(cleanKey(userId, key));
+          if (!obj) return { content: [{ type: "text", text: `Not found: ${key}` }] };
+          if (obj.size > 256 * 1024) return { content: [{ type: "text", text: `File too large (${obj.size} bytes, max 256KB). Narrow the key or split the file.` }] };
+          return { content: [{ type: "text", text: await obj.text() }] };
+        } catch (e: any) {
+          return { content: [{ type: "text", text: `Read failed: ${e.message}` }] };
+        }
+      }
+    });
+
+    this.registerTool({
+      name: "r2_list",
+      description: "List files in your R2 prefix.",
+      inputSchema: {
+        prefix: z.string().default("").describe("Filter by path prefix, e.g. 'reports/'"),
+        limit: z.number().min(1).max(100).default(50).describe("Max keys to return"),
+      },
+      annotations: { readOnlyHint: true },
+      handler: async ({ prefix, limit }) => {
+        const { userId, bucket } = r2Key();
+        if (!bucket) return { content: [{ type: "text", text: "R2 binding not configured." }] };
+        try {
+          const res = await bucket.list({ prefix: `${userId}/${prefix.replace(/^\/+/, "")}`, limit });
+          const files = (res.objects || []).map((o: any) => ({ key: o.key.replace(`${userId}/`, ""), size: o.size, updated: o.uploaded }));
+          return { content: [{ type: "text", text: JSON.stringify({ files, truncated: res.truncated }, null, 2) }] };
+        } catch (e: any) {
+          return { content: [{ type: "text", text: `List failed: ${e.message}` }] };
+        }
+      }
+    });
+
+    this.registerTool({
+      name: "r2_delete",
+      description: "Delete a file from your R2 prefix.",
+      inputSchema: { key: z.string().describe("Relative path to delete") },
+      annotations: { destructiveHint: true, readOnlyHint: false },
+      handler: async ({ key }) => {
+        const { userId, bucket } = r2Key();
+        if (!bucket) return { content: [{ type: "text", text: "R2 binding not configured." }] };
+        try {
+          await bucket.delete(cleanKey(userId, key));
+          return { content: [{ type: "text", text: `Deleted ${key}` }] };
+        } catch (e: any) {
+          return { content: [{ type: "text", text: `Delete failed: ${e.message}` }] };
         }
       }
     });

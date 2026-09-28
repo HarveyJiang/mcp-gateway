@@ -11,12 +11,13 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@cloudflare/computer": "^0.2.1",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "agents": "^0.0.80",
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20241205.0",
+    "@cloudflare/workers-types": "^4.20260702.1",
     "typescript": "^5.6.3",
     "vitest": "^2.1.4",
     "wrangler": "^3.83.0"
