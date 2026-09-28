@@ -151,6 +151,11 @@ curl -X POST https://mcp.2020224.xyz/auth/verify -H "Content-Type: application/j
 - 示例: `{"name":"public_github_search","arguments":{"query":"mcp server","per_page":5}}`
 - 返回: `{total, repos:[{name, description, stars, language, url}]}`，无 token 时限流 10 次/分钟
 
+### public_shorten_url / public_expand_url — 短链生成与还原
+- 生成 input: `{ url: "https://..." }`，返回 `{shortUrl, code, original}`，与 shorten.2020224.xyz 网站同款后端
+- 还原 input: `{ code: "X5FRtq" 或完整短链 }`，返回 `{code, target}`，不实际跳转
+- 示例: `{"name":"public_shorten_url","arguments":{"url":"https://example.com/long"}}`
+
 ### gateway_* — 元信息
 - `gateway_list_tools` / `gateway_list_resources` / `gateway_info` 均无参
 

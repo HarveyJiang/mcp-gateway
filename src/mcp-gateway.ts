@@ -236,6 +236,57 @@ export class PublicMCP extends McpGateway {
     });
 
     this.registerTool({
+      name: "public_shorten_url",
+      description: "Create a short link via shorten.2020224.xyz. Turns a long URL into https://shorten.2020224.xyz/XXXXXX. Same backend as the website, no auth needed.",
+      inputSchema: {
+        url: z.string().describe("Long URL starting with http:// or https://"),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+      handler: async ({ url }) => {
+        try {
+          if (!/^https?:\/\//i.test(url.trim())) {
+            return { content: [{ type: "text", text: "Invalid URL: must start with http:// or https://" }] };
+          }
+          const res = await fetch("https://shorten.2020224.xyz/api/shorten", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url: url.trim() }),
+          });
+          const data = await res.json() as any;
+          if (!res.ok) {
+            return { content: [{ type: "text", text: `Shorten failed: ${data.error || res.status}` }] };
+          }
+          return { content: [{ type: "text", text: JSON.stringify({ shortUrl: data.shortUrl, code: data.code, original: url.trim() }, null, 2) }] };
+        } catch (e: any) {
+          return { content: [{ type: "text", text: `Shorten failed: ${e.message}. Retry later.` }] };
+        }
+      }
+    });
+
+    this.registerTool({
+      name: "public_expand_url",
+      description: "Resolve a shorten.2020224.xyz short link to its target URL without following the redirect.",
+      inputSchema: {
+        code: z.string().describe("Short code or full short URL, e.g. 'X5FRtq' or 'https://shorten.2020224.xyz/X5FRtq'"),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: true },
+      handler: async ({ code }) => {
+        try {
+          const c = code.trim().split("/").filter(Boolean).pop() || "";
+          if (!c) return { content: [{ type: "text", text: "Invalid code: empty" }] };
+          const res = await fetch(`https://shorten.2020224.xyz/${encodeURIComponent(c)}`, { method: "GET", redirect: "manual" });
+          const target = res.headers.get("location");
+          if ((res.status === 301 || res.status === 302) && target) {
+            return { content: [{ type: "text", text: JSON.stringify({ code: c, target }, null, 2) }] };
+          }
+          return { content: [{ type: "text", text: `Not found or unexpected status ${res.status} for code: ${c}` }] };
+        } catch (e: any) {
+          return { content: [{ type: "text", text: `Expand failed: ${e.message}. Retry later.` }] };
+        }
+      }
+    });
+
+    this.registerTool({
       name: "public_github_search",
       description: "Search public GitHub repositories by keyword. Returns name, description, stars, language, url. No auth needed (rate limited without GITHUB_TOKEN).",
       inputSchema: {
