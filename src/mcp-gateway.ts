@@ -3,6 +3,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z, ZodRawShape, ZodObject } from "zod";
 import type { Env } from "./index";
 import { getUserWorkspace } from "./workspace";
+import { CHENGDU_HOSPITALS } from "./data/chengdu-hospitals";
 
 // ============================================================================
 // Types
@@ -283,6 +284,45 @@ export class PublicMCP extends McpGateway {
         } catch (e: any) {
           return { content: [{ type: "text", text: `Expand failed: ${e.message}. Retry later.` }] };
         }
+      }
+    });
+
+    this.registerTool({
+      name: "public_chengdu_hospitals",
+      description: "检索成都市医院名录, 支持按等级(三级甲等/三级乙等/二级甲等/二级乙等)/公立民营/行政区/专科/关键词过滤, 结果按等级分组返回. v1收录66家三级甲等.",
+      inputSchema: {
+        level: z.enum(["三级甲等", "三级乙等", "二级甲等", "二级乙等", "全部"]).default("全部").describe("医院等级"),
+        ownership: z.enum(["公立", "民营", "全部"]).default("全部").describe("公立(含军队/国企)或民营(含社会办医)"),
+        district: z.string().default("全部").describe("行政区, 如武侯区/双流区/简阳市/金堂县, 或全部"),
+        category: z.string().default("全部").describe("综合/中医类/妇幼专科/口腔专科/眼科专科/肿瘤专科/骨科专科/精神专科/传染病专科/职业病专科/肛肠专科/生殖专科, 或全部"),
+        keyword: z.string().optional().describe("名称关键词, 如华西/眼科/妇幼"),
+        limit: z.number().min(1).max(66).default(66).describe("最多返回条数"),
+      },
+      annotations: { readOnlyHint: true, idempotentHint: true },
+      handler: async ({ level, ownership, district, category, keyword, limit }) => {
+        let list = CHENGDU_HOSPITALS.filter(h =>
+          (level === "全部" || h.level === level) &&
+          (ownership === "全部" || h.ownership === ownership) &&
+          (district === "全部" || h.district === district || h.address.includes(district)) &&
+          (category === "全部" || h.category === category) &&
+          (!keyword || h.name.includes(keyword))
+        );
+        const total = list.length;
+        list = list.slice(0, limit);
+        const byLevel: Record<string, typeof list> = {};
+        for (const h of list) {
+          (byLevel[h.level] = byLevel[h.level] || []).push(h);
+        }
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              total, filters: { level, ownership, district, category, keyword: keyword || "" },
+              byLevel,
+              note: "v1收录成都市66家三级甲等医院(56公立/10民营). 查三级乙等/二级请直接用level过滤, 二级及以下名录补充中.",
+            }, null, 2),
+          }],
+        };
       }
     });
 

@@ -34,7 +34,7 @@ export const homeHTML = `<!DOCTYPE html>
   <!-- Hero -->
   <section class="max-w-6xl mx-auto px-6 pt-10 pb-6">
     <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-zinc-200 text-xs text-zinc-600">
-      <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> 2 MCP servers · 27 tools · 10GB持久化 · Streamable HTTP
+      <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> 2 MCP servers · 28 tools · 10GB持久化 · Streamable HTTP
     </div>
     <h1 class="mt-4 text-4xl sm:text-5xl font-bold tracking-tight">模型上下文协议<span class="text-zinc-400">网关</span></h1>
     <p class="mt-3 text-zinc-600 max-w-2xl">统一的 MCP 服务网关，公开服务无需鉴权，私有服务支持 <span class="mono bg-white border border-zinc-200 px-1.5 py-0.5 rounded text-sm">Bearer mcp_sk_...</span> 按 token 限 scopes / quota / 限流。给 Hermes 这类无弹窗智能体直接用。</p>
@@ -79,7 +79,7 @@ export const homeHTML = `<!DOCTYPE html>
           </div>
         </div>
         <div class="bg-zinc-50 border-t border-zinc-200 p-2">
-          <div class="text-xs text-zinc-500 px-4 py-2">包含 9 个工具</div>
+          <div class="text-xs text-zinc-500 px-4 py-2">包含 10 个工具</div>
           <div class="space-y-2 px-2 pb-2">
             <div class="tool bg-white border border-zinc-200 rounded-xl p-3" data-search="public_get_time 时间 时区 shanghai tokyo new_york">
               <div class="flex items-center justify-between"><span class="mono text-sm font-medium">public_get_time</span><span class="text-xs px-2 py-0.5 rounded-full bg-zinc-900 text-white">readOnly</span></div>
@@ -105,6 +105,11 @@ export const homeHTML = `<!DOCTYPE html>
               <div class="flex items-center justify-between"><span class="mono text-sm font-medium">public_shorten_url / public_expand_url</span><span class="text-xs px-2 py-0.5 rounded-full bg-zinc-100 border">openWorld</span></div>
               <div class="text-sm text-zinc-600 mt-1">生成短链与还原短链（shorten.2020224.xyz 同款后端）。</div>
               <div class="mt-2 mono text-xs bg-zinc-900 text-zinc-100 rounded-lg p-2.5">{"url":"https://...long"} → {"shortUrl":"https://shorten.2020224.xyz/X5FRtq"}</div>
+            </div>
+            <div class="tool bg-white border border-zinc-200 rounded-xl p-3" data-search="public_chengdu_hospitals 成都 医院 医疗机构 等级 三甲 公立 私立 民营 武侯 双流">
+              <div class="flex items-center justify-between"><span class="mono text-sm font-medium">public_chengdu_hospitals</span><span class="text-xs px-2 py-0.5 rounded-full bg-zinc-900 text-white">readOnly</span></div>
+              <div class="text-sm text-zinc-600 mt-1">成都66家三甲名录，按等级/公立民营/行政区/专科过滤，按等级分组返回。</div>
+              <div class="mt-2 mono text-xs bg-zinc-900 text-zinc-100 rounded-lg p-2.5">{"ownership":"民营","district":"全部"} → 11家民营三甲</div>
             </div>
             <div class="tool bg-white border border-zinc-200 rounded-xl p-3" data-search="gateway_list_tools gateway_info gateway_list_resources 元信息">
               <div class="mono text-sm font-medium">gateway_* <span class="text-zinc-500 font-normal">gateway_list_tools / gateway_info</span></div>

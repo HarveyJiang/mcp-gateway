@@ -156,6 +156,11 @@ curl -X POST https://mcp.2020224.xyz/auth/verify -H "Content-Type: application/j
 - 还原 input: `{ code: "X5FRtq" 或完整短链 }`，返回 `{code, target}`，不实际跳转
 - 示例: `{"name":"public_shorten_url","arguments":{"url":"https://example.com/long"}}`
 
+### public_chengdu_hospitals — 成都医院名录（66家三甲，56公立/10民营）
+- input: `{ level: 三级甲等|三级乙等|二级甲等|二级乙等|全部, ownership: 公立|民营|全部, district: 武侯区|双流区|简阳市...|全部, category: 综合|中医类|妇幼专科|口腔专科...|全部, keyword?, limit }`
+- 示例: `{"name":"public_chengdu_hospitals","arguments":{"ownership":"民营"}}`
+- 返回按等级分组 `{total, byLevel}`，多院区医院会在其服务的每个区都出现；v1仅收录三级甲等，二级及以下补充中
+
 ### gateway_* — 元信息
 - `gateway_list_tools` / `gateway_list_resources` / `gateway_info` 均无参
 
